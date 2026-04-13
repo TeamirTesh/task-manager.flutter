@@ -106,32 +106,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       const Divider(height: 1),
                   itemBuilder: (context, index) {
                     final task = tasks[index];
-                    return ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                      leading: Checkbox(
-                        value: task.isComplete,
-                        onChanged: (value) {
-                          if (value == null) return;
-                          _taskService.updateTask(
-                            task.copyWith(isComplete: value),
-                          );
-                        },
-                      ),
-                      title: Text(
-                        task.name,
-                        style: task.isComplete
-                            ? TextStyle(
-                                decoration: TextDecoration.lineThrough,
-                                color: Theme.of(context).hintColor,
-                              )
-                            : null,
-                      ),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline),
-                        tooltip: 'Delete',
-                        onPressed: () =>
-                            _taskService.deleteTask(task.id),
-                      ),
+                    return _ExpandableTaskTile(
+                      task: task,
+                      taskService: _taskService,
                     );
                   },
                 );
@@ -140,6 +117,133 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ExpandableTaskTile extends StatefulWidget {
+  const _ExpandableTaskTile({
+    required this.task,
+    required this.taskService,
+  });
+
+  final Task task;
+  final TaskService taskService;
+
+  @override
+  State<_ExpandableTaskTile> createState() => _ExpandableTaskTileState();
+}
+
+class _ExpandableTaskTileState extends State<_ExpandableTaskTile> {
+  final _subtaskController = TextEditingController();
+
+  @override
+  void dispose() {
+    _subtaskController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _addSubtask() async {
+    final text = _subtaskController.text.trim();
+    if (text.isEmpty) return;
+    await widget.taskService.addSubtask(widget.task.id, text);
+    _subtaskController.clear();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final task = widget.task;
+    final theme = Theme.of(context);
+
+    return ExpansionTile(
+      leading: Checkbox(
+        value: task.isComplete,
+        onChanged: (value) {
+          if (value == null) return;
+          widget.taskService.updateTask(
+            task.copyWith(isComplete: value),
+          );
+        },
+      ),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              task.name,
+              style: task.isComplete
+                  ? TextStyle(
+                      decoration: TextDecoration.lineThrough,
+                      color: theme.hintColor,
+                    )
+                  : null,
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline),
+            tooltip: 'Delete task',
+            onPressed: () => widget.taskService.deleteTask(task.id),
+          ),
+        ],
+      ),
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (task.subtasks.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'No subtasks yet.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.hintColor,
+                    ),
+                  ),
+                )
+              else
+                ...task.subtasks.map(
+                  (sub) => ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(sub),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      tooltip: 'Remove subtask',
+                      onPressed: () => widget.taskService.removeSubtask(
+                        task.id,
+                        sub,
+                      ),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _subtaskController,
+                      textInputAction: TextInputAction.done,
+                      decoration: const InputDecoration(
+                        hintText: 'Subtask',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      onSubmitted: (_) => _addSubtask(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.tonal(
+                    onPressed: _addSubtask,
+                    child: const Text('Add'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
